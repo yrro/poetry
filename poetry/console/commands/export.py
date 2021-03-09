@@ -1,7 +1,5 @@
 from cleo.helpers import option
 
-from poetry.utils.exporter import Exporter
-
 from .command import Command
 
 
@@ -16,7 +14,7 @@ class ExportCommand(Command):
             "f",
             "Format to export to. Currently, only requirements.txt is supported.",
             flag=False,
-            default=Exporter.FORMAT_REQUIREMENTS_TXT,
+            default="requirements.txt",
         ),
         option("output", "o", "The name of the output file.", flag=False),
         option("without-hashes", None, "Exclude hashes from the exported file."),
@@ -32,6 +30,8 @@ class ExportCommand(Command):
     ]
 
     def handle(self) -> None:
+        from poetry.utils.exporter import Exporter
+
         fmt = self.option("format")
 
         if fmt not in Exporter.ACCEPTED_FORMATS:

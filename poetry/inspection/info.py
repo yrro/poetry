@@ -5,27 +5,21 @@ import tarfile
 import zipfile
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 from typing import Dict
 from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Union
 
-import pkginfo
 
-from poetry.core.factory import Factory
-from poetry.core.packages.dependency import Dependency
-from poetry.core.packages.package import Package
-from poetry.core.packages.project_package import ProjectPackage
-from poetry.core.pyproject.toml import PyProjectTOML
-from poetry.core.utils.helpers import parse_requires
-from poetry.core.utils.helpers import temporary_directory
-from poetry.core.version.markers import InvalidMarker
-from poetry.utils.env import EnvCommandError
-from poetry.utils.env import EnvManager
-from poetry.utils.env import VirtualEnv
-from poetry.utils.setup_reader import SetupReader
+if TYPE_CHECKING:
+    from pkginfo import BDist
+    from pkginfo import SDist
+    from pkginfo import Wheel
 
+    from poetry.core.packages.package import Package
+    from poetry.core.packages.project_package import ProjectPackage
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +121,7 @@ class PackageInfo:
         name: Optional[str] = None,
         extras: Optional[List[str]] = None,
         root_dir: Optional[Path] = None,
-    ) -> Package:
+    ) -> "Package":
         """
         Create a new `poetry.core.packages.package.Package` instance using metadata from this instance.
 
@@ -136,6 +130,10 @@ class PackageInfo:
         :param root_dir:  Optional root directory to use for the package. If set, dependency strings
             will be parsed relative to this directory.
         """
+        from poetry.core.packages.dependency import Dependency
+        from poetry.core.packages.package import Package
+        from poetry.core.version.markers import InvalidMarker
+
         name = name or self.name
 
         if not self.version:
@@ -203,13 +201,15 @@ class PackageInfo:
 
     @classmethod
     def _from_distribution(
-        cls, dist: Union[pkginfo.BDist, pkginfo.SDist, pkginfo.Wheel]
+        cls, dist: Union["BDist", "SDist", "Wheel"]
     ) -> "PackageInfo":
         """
         Helper method to parse package information from a `pkginfo.Distribution` instance.
 
         :param dist: The distribution instance to parse information from.
         """
+        from poetry.core.utils.helpers import parse_requires
+
         requirements = None
 
         if dist.requires_dist:
@@ -243,10 +243,14 @@ class PackageInfo:
 
         :param path: The sdist file to parse information from.
         """
+        from pkginfo import SDist
+
+        from poetry.core.utils.helpers import temporary_directory
+
         info = None
 
         try:
-            info = cls._from_distribution(pkginfo.SDist(str(path)))
+            info = cls._from_distribution(SDist(str(path)))
         except ValueError:
             # Unable to determine dependencies
             # We pass and go deeper
@@ -297,6 +301,8 @@ class PackageInfo:
 
     @staticmethod
     def has_setup_files(path: Path) -> bool:
+        from poetry.utils.setup_reader import SetupReader
+
         return any((path / f).exists() for f in SetupReader.FILES)
 
     @classmethod
@@ -308,6 +314,9 @@ class PackageInfo:
 
         :param path: Path to `setup.py` file
         """
+        from poetry.core.utils.helpers import parse_requires
+        from poetry.utils.setup_reader import SetupReader
+
         if not cls.has_setup_files(path):
             raise PackageInfoError(
                 path, "No setup files (setup.py, setup.cfg) was found."
@@ -379,6 +388,9 @@ class PackageInfo:
 
         :param path: The metadata directory to parse information from.
         """
+        from pkginfo import UnpackedSDist
+        from pkginfo import Wheel
+
         if path.suffix in {".dist-info", ".egg-info"}:
             directories = [path]
         else:
@@ -387,9 +399,9 @@ class PackageInfo:
         for directory in directories:
             try:
                 if directory.suffix == ".egg-info":
-                    dist = pkginfo.UnpackedSDist(directory.as_posix())
+                    dist = UnpackedSDist(directory.as_posix())
                 elif directory.suffix == ".dist-info":
-                    dist = pkginfo.Wheel(directory.as_posix())
+                    dist = Wheel(directory.as_posix())
                 else:
                     continue
                 break
@@ -398,7 +410,7 @@ class PackageInfo:
         else:
             try:
                 # handle PKG-INFO in unpacked sdist root
-                dist = pkginfo.UnpackedSDist(path.as_posix())
+                dist = UnpackedSDist(path.as_posix())
             except ValueError:
                 return
 
@@ -407,7 +419,7 @@ class PackageInfo:
             return info
 
     @classmethod
-    def from_package(cls, package: Package) -> "PackageInfo":
+    def from_package(cls, package: "Package") -> "PackageInfo":
         """
         Helper method to inspect a `Package` object, in order to generate package info.
 
@@ -430,7 +442,10 @@ class PackageInfo:
         )
 
     @staticmethod
-    def _get_poetry_package(path: Path) -> Optional[ProjectPackage]:
+    def _get_poetry_package(path: Path) -> Optional["ProjectPackage"]:
+        from poetry.core.factory import Factory
+        from poetry.core.pyproject.toml import PyProjectTOML
+
         # Note: we ignore any setup.py file at this step
         # TODO: add support for handling non-poetry PEP-517 builds
         if PyProjectTOML(path.joinpath("pyproject.toml")).is_poetry_project():
@@ -443,6 +458,11 @@ class PackageInfo:
 
         :param path: Path to package source to build and read metadata for.
         """
+        from poetry.utils.env import EnvCommandError
+        from poetry.utils.env import EnvManager
+        from poetry.utils.env import VirtualEnv
+        from poetry.utils.helpers import temporary_directory
+
         info = None
         try:
             info = cls.from_setup_files(path)
@@ -566,8 +586,10 @@ class PackageInfo:
 
         :param path: Path to wheel.
         """
+        from pkginfo import Wheel
+
         try:
-            return cls._from_distribution(pkginfo.Wheel(str(path)))
+            return cls._from_distribution(Wheel(str(path)))
         except ValueError:
             return PackageInfo()
 
@@ -578,14 +600,17 @@ class PackageInfo:
 
         :param path: Path to bdist.
         """
-        if isinstance(path, (pkginfo.BDist, pkginfo.Wheel)):
+        from pkginfo import BDist
+        from pkginfo import Wheel
+
+        if isinstance(path, (BDist, Wheel)):
             cls._from_distribution(dist=path)
 
         if path.suffix == ".whl":
             return cls.from_wheel(path=path)
 
         try:
-            return cls._from_distribution(pkginfo.BDist(str(path)))
+            return cls._from_distribution(BDist(str(path)))
         except ValueError as e:
             raise PackageInfoError(path, e)
 

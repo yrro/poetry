@@ -14,32 +14,22 @@ from typing import Any
 from typing import List
 from typing import Union
 
-from cleo.io.null_io import NullIO
-
-from poetry.core.packages.file_dependency import FileDependency
-from poetry.core.packages.utils.link import Link
-from poetry.core.pyproject.toml import PyProjectTOML
 from poetry.utils._compat import decode
-from poetry.utils.env import EnvCommandError
-from poetry.utils.helpers import safe_rmtree
-
-from .authenticator import Authenticator
-from .chef import Chef
-from .chooser import Chooser
-from .operations.install import Install
-from .operations.operation import Operation
-from .operations.uninstall import Uninstall
-from .operations.update import Update
 
 
 if TYPE_CHECKING:
     from cleo.io.io import IO  # noqa
 
     from poetry.config.config import Config
+    from poetry.core.packages.utils.link import Link
     from poetry.repositories import Pool
     from poetry.utils.env import Env
 
-    from .operations import OperationTypes
+    from .operations.install import Install
+    from .operations.operation import Operation
+    from .operations.types import OperationTypes
+    from .operations.uninstall import Uninstall
+    from .operations.update import Update
 
 
 class Executor(object):
@@ -51,6 +41,10 @@ class Executor(object):
         io: "IO",
         parallel: bool = None,
     ) -> None:
+        from .authenticator import Authenticator
+        from .chef import Chef
+        from .chooser import Chooser
+
         self._env = env
         self._io = io
         self._dry_run = False
@@ -186,6 +180,8 @@ class Executor(object):
             section.write(line)
 
     def _execute_operation(self, operation: "OperationTypes") -> None:
+        from poetry.utils.env import EnvCommandError
+
         try:
             if self.supports_fancy_output():
                 if id(operation) not in self._sections:
@@ -319,6 +315,8 @@ class Executor(object):
                 self._skipped[operation.job_type] += 1
 
     def run_pip(self, *args: Any, **kwargs: Any) -> int:
+        from poetry.utils.env import EnvCommandError
+
         try:
             self._env.run_pip(*args, **kwargs)
         except EnvCommandError as e:
@@ -436,13 +434,13 @@ class Executor(object):
         )
         self._io.write_line("")
 
-    def _execute_install(self, operation: Union[Install, Update]) -> int:
+    def _execute_install(self, operation: Union["Install", "Update"]) -> int:
         return self._install(operation)
 
-    def _execute_update(self, operation: Union[Install, Update]) -> int:
+    def _execute_update(self, operation: Union["Install", "Update"]) -> int:
         return self._update(operation)
 
-    def _execute_uninstall(self, operation: Uninstall) -> int:
+    def _execute_uninstall(self, operation: "Uninstall") -> int:
         message = (
             "  <fg=blue;options=bold>•</> {message}: <info>Removing...</info>".format(
                 message=self.get_operation_message(operation),
@@ -452,7 +450,9 @@ class Executor(object):
 
         return self._remove(operation)
 
-    def _install(self, operation: Union[Install, Update]) -> int:
+    def _install(self, operation: Union["Install", "Update"]) -> int:
+        from poetry.core.packages.utils.link import Link
+
         package = operation.package
         if package.source_type == "directory":
             return self._install_directory(operation)
@@ -481,10 +481,12 @@ class Executor(object):
 
         return self.run_pip(*args)
 
-    def _update(self, operation: Union[Install, Update]) -> int:
+    def _update(self, operation: Union["Install", "Update"]) -> int:
         return self._install(operation)
 
-    def _remove(self, operation: Uninstall) -> int:
+    def _remove(self, operation: "Uninstall") -> int:
+        from poetry.utils.helpers import safe_rmtree
+
         package = operation.package
 
         # If we have a VCS package, remove its source directory
@@ -501,7 +503,7 @@ class Executor(object):
 
             raise
 
-    def _prepare_file(self, operation: Union[Install, Update]) -> Path:
+    def _prepare_file(self, operation: Union["Install", "Update"]) -> Path:
         package = operation.package
 
         message = (
@@ -519,7 +521,10 @@ class Executor(object):
 
         return archive
 
-    def _install_directory(self, operation: Union[Install, Update]) -> int:
+    def _install_directory(self, operation: Union["Install", "Update"]) -> int:
+        from cleo.io.null_io import NullIO
+
+        from poetry.core.pyproject.toml import PyProjectTOML
         from poetry.factory import Factory
 
         package = operation.package
@@ -585,7 +590,7 @@ class Executor(object):
 
         return self.run_pip(*args)
 
-    def _install_git(self, operation: Union[Install, Update]) -> int:
+    def _install_git(self, operation: Union["Install", "Update"]) -> int:
         from poetry.core.vcs import Git
 
         package = operation.package
@@ -613,12 +618,16 @@ class Executor(object):
 
         return self._install_directory(operation)
 
-    def _download(self, operation: Union[Install, Update]) -> Link:
+    def _download(self, operation: Union["Install", "Update"]) -> "Link":
         link = self._chooser.choose_for(operation.package)
 
         return self._download_link(operation, link)
 
-    def _download_link(self, operation: Union[Install, Update], link: Link) -> Link:
+    def _download_link(
+        self, operation: Union["Install", "Update"], link: "Link"
+    ) -> "Link":
+        from poetry.core.packages.file_dependency import FileDependency
+
         package = operation.package
 
         archive = self._chef.get_cached_archive_for_link(link)
@@ -650,7 +659,9 @@ class Executor(object):
 
         return archive
 
-    def _download_archive(self, operation: Union[Install, Update], link: Link) -> Path:
+    def _download_archive(
+        self, operation: Union["Install", "Update"], link: "Link"
+    ) -> Path:
         response = self._authenticator.request(
             "get", link.url, stream=True, io=self._sections.get(id(operation), self._io)
         )
@@ -699,7 +710,7 @@ class Executor(object):
 
         return archive
 
-    def _should_write_operation(self, operation: Operation) -> bool:
+    def _should_write_operation(self, operation: "Operation") -> bool:
         if not operation.skipped:
             return True
 

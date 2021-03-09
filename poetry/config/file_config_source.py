@@ -3,9 +3,6 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Iterator
 
-from tomlkit import document
-from tomlkit import table
-
 from .config_source import ConfigSource
 
 
@@ -29,6 +26,8 @@ class FileConfigSource(ConfigSource):
         return self._file
 
     def add_property(self, key: str, value: Any) -> None:
+        from tomlkit import table
+
         with self.secure() as config:
             keys = key.split(".")
 
@@ -60,6 +59,8 @@ class FileConfigSource(ConfigSource):
 
     @contextmanager
     def secure(self) -> Iterator["TOMLDocument"]:
+        from tomlkit import document
+
         if self.file.exists():
             initial_config = self.file.read()
             config = self.file.read()

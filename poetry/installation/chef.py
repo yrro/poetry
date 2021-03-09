@@ -6,15 +6,10 @@ from typing import TYPE_CHECKING
 from typing import List
 from typing import Optional
 
-from poetry.core.packages.utils.link import Link
-
-from .chooser import InvalidWheelName
-from .chooser import Wheel
-
 
 if TYPE_CHECKING:
-
     from poetry.config.config import Config
+    from poetry.core.packages.utils.link import Link
     from poetry.utils.env import Env
 
 
@@ -41,7 +36,10 @@ class Chef:
     def is_wheel(self, archive: Path) -> bool:
         return archive.suffix == ".whl"
 
-    def get_cached_archive_for_link(self, link: Link) -> Optional[Link]:
+    def get_cached_archive_for_link(self, link: "Link") -> Optional["Link"]:
+        from .chooser import InvalidWheelName
+        from .chooser import Wheel
+
         # If the archive is already a wheel, there is no need to cache it.
         if link.is_wheel:
             pass
@@ -74,7 +72,9 @@ class Chef:
 
         return min(candidates)[1]
 
-    def get_cached_archives_for_link(self, link: Link) -> List[Link]:
+    def get_cached_archives_for_link(self, link: "Link") -> List["Link"]:
+        from poetry.core.packages.utils.link import Link
+
         cache_dir = self.get_cache_directory_for_link(link)
 
         archive_types = ["whl", "tar.gz", "tar.bz2", "bz2", "zip"]
@@ -85,7 +85,7 @@ class Chef:
 
         return links
 
-    def get_cache_directory_for_link(self, link: Link) -> Path:
+    def get_cache_directory_for_link(self, link: "Link") -> Path:
         key_parts = {"url": link.url_without_fragment}
 
         if link.hash_name is not None and link.hash is not None:

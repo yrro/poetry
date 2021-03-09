@@ -14,10 +14,10 @@ def build_venv(
 def check_output_wrapper(version=Version.parse("3.7.1")):
     def check_output(cmd, *args, **kwargs):
         if "sys.version_info[:3]" in cmd:
-            return version.text
+            return version.text.encode()
         elif "sys.version_info[:2]" in cmd:
-            return "{}.{}".format(version.major, version.minor)
+            return "{}.{}".format(version.major, version.minor).encode()
         else:
-            return str(Path("/prefix"))
+            return str(Path("/prefix")).encode()
 
     return check_output

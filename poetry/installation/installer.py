@@ -4,45 +4,42 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from cleo.io.io import IO
-from cleo.io.null_io import NullIO
-
-from poetry.config.config import Config
-from poetry.core.packages.project_package import ProjectPackage
-from poetry.packages import Locker
-from poetry.repositories import Pool
-from poetry.repositories import Repository
-from poetry.repositories.installed_repository import InstalledRepository
-from poetry.utils.extras import get_extra_package_names
-from poetry.utils.helpers import canonicalize_name
-
-from .base_installer import BaseInstaller
-from .executor import Executor
-from .operations import Install
-from .operations import Uninstall
-from .operations import Update
-from .operations.operation import Operation
-from .pip_installer import PipInstaller
-
 
 if TYPE_CHECKING:
+    from cleo.io.io import IO
+    from cleo.io.null_io import NullIO
+
+    from poetry.config.config import Config
+    from poetry.core.packages.project_package import ProjectPackage
+    from poetry.packages.locker import Locker
+    from poetry.repositories.installed_repository import InstalledRepository
+    from poetry.repositories.pool import Pool
+    from poetry.repositories.repository import Repository
     from poetry.utils.env import Env
 
-    from .operations import OperationTypes
+    from .base_installer import BaseInstaller
+    from .executor import Executor
+    from .operations.install import Install
+    from .operations.operation import Operation
+    from .operations.types import OperationTypes
+    from .operations.uninstall import Uninstall
+    from .operations.update import Update
 
 
 class Installer:
     def __init__(
         self,
-        io: IO,
+        io: "IO",
         env: "Env",
-        package: ProjectPackage,
-        locker: Locker,
-        pool: Pool,
-        config: Config,
-        installed: Union[InstalledRepository, None] = None,
-        executor: Optional[Executor] = None,
-    ):
+        package: "ProjectPackage",
+        locker: "Locker",
+        pool: "Pool",
+        config: "Config",
+        installed: Union["InstalledRepository", None] = None,
+        executor: Optional["Executor"] = None,
+    ) -> None:
+        from .executor import Executor
+
         self._io = io
         self._env = env
         self._package = package
@@ -76,19 +73,19 @@ class Installer:
         self._installed_repository = installed
 
     @property
-    def executor(self) -> Executor:
+    def executor(self) -> "Executor":
         return self._executor
 
     @property
-    def installer(self) -> BaseInstaller:
+    def installer(self) -> "BaseInstaller":
         return self._installer
 
-    def set_package(self, package: ProjectPackage) -> "Installer":
+    def set_package(self, package: "ProjectPackage") -> "Installer":
         self._package = package
 
         return self
 
-    def set_locker(self, locker: Locker) -> "Installer":
+    def set_locker(self, locker: "Locker") -> "Installer":
         self._locker = locker
 
         return self
@@ -97,6 +94,8 @@ class Installer:
         # Check if refresh
         if not self._update and self._lock and self._locker.is_locked():
             return self._do_refresh()
+
+        from poetry.repositories.repository import Repository
 
         # Force update if there is no lock file present
         if not self._update and not self._locker.is_locked():
@@ -180,6 +179,8 @@ class Installer:
         return self
 
     def whitelist(self, packages: Iterable[str]) -> "Installer":
+        from poetry.utils.helpers import canonicalize_name
+
         self._whitelist = [canonicalize_name(p) for p in packages]
 
         return self
@@ -196,6 +197,7 @@ class Installer:
 
     def _do_refresh(self) -> int:
         from poetry.puzzle import Solver
+        from poetry.repositories.repository import Repository
 
         # Checking extras
         for extra in self._extras:
@@ -220,8 +222,12 @@ class Installer:
 
         return 0
 
-    def _do_install(self, local_repo: Repository) -> int:
+    def _do_install(self, local_repo: "Repository") -> int:
+        from cleo.io.null_io import NullIO
+
         from poetry.puzzle import Solver
+        from poetry.repositories.pool import Pool
+        from poetry.repositories.repository import Repository
 
         locked_repository = Repository()
         if self._update:
@@ -335,7 +341,7 @@ class Installer:
         # Execute operations
         return self._execute(ops)
 
-    def _write_lock_file(self, repo: Repository, force: bool = True) -> None:
+    def _write_lock_file(self, repo: "Repository", force: bool = True) -> None:
         if force or (self._update and self._write_lock):
             updated_lock = self._locker.set_lock_data(self._package, repo.packages)
 
@@ -391,7 +397,7 @@ class Installer:
 
         return 0
 
-    def _execute_operation(self, operation: Operation) -> None:
+    def _execute_operation(self, operation: "Operation") -> None:
         """
         Execute a given operation.
         """
@@ -399,7 +405,7 @@ class Installer:
 
         getattr(self, "_execute_{}".format(method))(operation)
 
-    def _execute_install(self, operation: Install) -> None:
+    def _execute_install(self, operation: "Install") -> None:
         if operation.skipped:
             if self.is_verbose() and (self._execute_operations or self.is_dry_run()):
                 self._io.write_line(
@@ -424,7 +430,7 @@ class Installer:
 
         self._installer.install(operation.package)
 
-    def _execute_update(self, operation: Update) -> None:
+    def _execute_update(self, operation: "Update") -> None:
         source = operation.initial_package
         target = operation.target_package
 
@@ -454,7 +460,7 @@ class Installer:
 
         self._installer.update(source, target)
 
-    def _execute_uninstall(self, operation: Uninstall) -> None:
+    def _execute_uninstall(self, operation: "Uninstall") -> None:
         if operation.skipped:
             if self.is_verbose() and (self._execute_operations or self.is_dry_run()):
                 self._io.write_line(
@@ -480,8 +486,11 @@ class Installer:
         self._installer.remove(operation.package)
 
     def _populate_local_repo(
-        self, local_repo: Repository, ops: List[Operation]
+        self, local_repo: "Repository", ops: List["Operation"]
     ) -> None:
+        from .operations.uninstall import Uninstall
+        from .operations.update import Update
+
         for op in ops:
             if isinstance(op, Uninstall):
                 continue
@@ -494,8 +503,12 @@ class Installer:
                 local_repo.add_package(package)
 
     def _get_operations_from_lock(
-        self, locked_repository: Repository
-    ) -> List[Operation]:
+        self, locked_repository: "Repository"
+    ) -> List["Operation"]:
+        from .operations.install import Install
+        from .operations.uninstall import Uninstall
+        from .operations.update import Update
+
         installed_repo = self._installed_repository
         ops = []
 
@@ -526,7 +539,9 @@ class Installer:
 
         return ops
 
-    def _filter_operations(self, ops: List[Operation], repo: Repository) -> None:
+    def _filter_operations(self, ops: List["Operation"], repo: "Repository") -> None:
+        from .operations.update import Update
+
         extra_packages = self._get_extra_packages(repo)
         for op in ops:
             if isinstance(op, Update):
@@ -561,12 +576,14 @@ class Installer:
             if package.category == "dev" and not self.is_dev_mode():
                 op.skip("Dev dependencies not requested")
 
-    def _get_extra_packages(self, repo: Repository) -> List[str]:
+    def _get_extra_packages(self, repo: "Repository") -> List[str]:
         """
         Returns all package names required by extras.
 
         Maybe we just let the solver handle it?
         """
+        from poetry.utils.extras import get_extra_package_names
+
         if self._update:
             extras = {k: [d.name for d in v] for k, v in self._package.extras.items()}
         else:
@@ -574,8 +591,12 @@ class Installer:
 
         return list(get_extra_package_names(repo.packages, extras, self._extras))
 
-    def _get_installer(self) -> BaseInstaller:
+    def _get_installer(self) -> "BaseInstaller":
+        from .pip_installer import PipInstaller
+
         return PipInstaller(self._env, self._io, self._pool)
 
-    def _get_installed(self) -> InstalledRepository:
+    def _get_installed(self) -> "InstalledRepository":
+        from poetry.repositories.installed_repository import InstalledRepository
+
         return InstalledRepository.load(self._env)

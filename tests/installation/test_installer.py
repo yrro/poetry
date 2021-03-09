@@ -12,8 +12,8 @@ from cleo.io.null_io import NullIO
 from poetry.core.packages.project_package import ProjectPackage
 from poetry.core.toml.file import TOMLFile
 from poetry.factory import Factory
-from poetry.installation import Installer as BaseInstaller
 from poetry.installation.executor import Executor as BaseExecutor
+from poetry.installation.installer import Installer as BaseInstaller
 from poetry.installation.noop_installer import NoopInstaller
 from poetry.packages import Locker as BaseLocker
 from poetry.repositories import Pool

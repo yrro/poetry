@@ -14,9 +14,9 @@ from cleo.io.buffered_io import BufferedIO
 from poetry.config.config import Config
 from poetry.core.packages.package import Package
 from poetry.installation.executor import Executor
-from poetry.installation.operations import Install
-from poetry.installation.operations import Uninstall
-from poetry.installation.operations import Update
+from poetry.installation.operations.install import Install
+from poetry.installation.operations.uninstall import Uninstall
+from poetry.installation.operations.update import Update
 from poetry.repositories.pool import Pool
 from poetry.utils.env import MockEnv
 from tests.repositories.test_pypi_repository import MockRepository

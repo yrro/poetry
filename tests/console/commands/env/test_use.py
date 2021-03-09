@@ -27,7 +27,7 @@ def mock_subprocess_calls(setup, current_python, mocker):
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None), ("/prefix", None), ("/prefix", None)],
+        side_effect=[(b"/prefix", None), (b"/prefix", None), (b"/prefix", None)],
     )
 
 

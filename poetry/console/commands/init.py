@@ -12,10 +12,8 @@ from typing import Tuple
 from typing import Union
 
 from cleo.helpers import option
-from tomlkit import inline_table
 
 from .command import Command
-from .env_command import EnvCommand
 
 
 if TYPE_CHECKING:
@@ -498,6 +496,8 @@ The <c1>init</c1> command creates a basic <comment>pyproject.toml</> file in the
     def _format_requirements(
         self, requirements: List[Dict[str, str]]
     ) -> Dict[str, Union[str, Dict[str, str]]]:
+        from tomlkit import inline_table
+
         requires = {}
         for requirement in requirements:
             name = requirement.pop("name")
@@ -540,6 +540,8 @@ The <c1>init</c1> command creates a basic <comment>pyproject.toml</> file in the
     def _get_pool(self) -> "Pool":
         from poetry.repositories import Pool
         from poetry.repositories.pypi_repository import PyPiRepository
+
+        from .env_command import EnvCommand
 
         if isinstance(self, EnvCommand):
             return self.poetry.pool

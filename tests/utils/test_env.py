@@ -126,11 +126,11 @@ def build_venv(
 def check_output_wrapper(version=Version.parse("3.7.1")):
     def check_output(cmd, *args, **kwargs):
         if "sys.version_info[:3]" in cmd:
-            return version.text
+            return version.text.encode()
         elif "sys.version_info[:2]" in cmd:
-            return "{}.{}".format(version.major, version.minor)
+            return "{}.{}".format(version.major, version.minor).encode()
         else:
-            return str(Path("/prefix"))
+            return str(Path("/prefix")).encode()
 
     return check_output
 
@@ -149,7 +149,7 @@ def test_activate_activates_non_existing_virtualenv_no_envs_file(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None), ("/prefix", None)],
+        side_effect=[(b"/prefix", None), (b"/prefix", None)],
     )
     m = mocker.patch("poetry.utils.env.EnvManager.build_venv", side_effect=build_venv)
 
@@ -190,7 +190,7 @@ def test_activate_activates_existing_virtualenv_no_envs_file(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None)],
+        side_effect=[(b"/prefix", None)],
     )
     m = mocker.patch("poetry.utils.env.EnvManager.build_venv", side_effect=build_venv)
 
@@ -231,7 +231,7 @@ def test_activate_activates_same_virtualenv_with_envs_file(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None)],
+        side_effect=[(b"/prefix", None)],
     )
     m = mocker.patch("poetry.utils.env.EnvManager.create_venv")
 
@@ -270,7 +270,7 @@ def test_activate_activates_different_virtualenv_with_envs_file(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None), ("/prefix", None), ("/prefix", None)],
+        side_effect=[(b"/prefix", None), (b"/prefix", None), (b"/prefix", None)],
     )
     m = mocker.patch("poetry.utils.env.EnvManager.build_venv", side_effect=build_venv)
 
@@ -314,11 +314,11 @@ def test_activate_activates_recreates_for_different_patch(
     mocker.patch(
         "subprocess.Popen.communicate",
         side_effect=[
-            ("/prefix", None),
-            ('{"version_info": [3, 7, 0]}', None),
-            ("/prefix", None),
-            ("/prefix", None),
-            ("/prefix", None),
+            (b"/prefix", None),
+            (b'{"version_info": [3, 7, 0]}', None),
+            (b"/prefix", None),
+            (b"/prefix", None),
+            (b"/prefix", None),
         ],
     )
     build_venv_m = mocker.patch(
@@ -370,7 +370,7 @@ def test_activate_does_not_recreate_when_switching_minor(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None), ("/prefix", None), ("/prefix", None)],
+        side_effect=[(b"/prefix", None), (b"/prefix", None), (b"/prefix", None)],
     )
     build_venv_m = mocker.patch(
         "poetry.utils.env.EnvManager.build_venv", side_effect=build_venv
@@ -486,7 +486,7 @@ def test_get_prefers_explicitly_activated_virtualenvs_over_env_var(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None)],
+        side_effect=[(b"/prefix", None)],
     )
 
     env = manager.get()
@@ -675,7 +675,7 @@ def test_create_venv_tries_to_find_a_compatible_python_executable_using_specific
     venv_name = manager.generate_env_name("simple-project", str(poetry.file.parent))
 
     mocker.patch("sys.version_info", (2, 7, 16))
-    mocker.patch("subprocess.check_output", side_effect=["3.5.3", "3.9.0"])
+    mocker.patch("subprocess.check_output", side_effect=[b"3.5.3", b"3.9.0"])
     m = mocker.patch(
         "poetry.utils.env.EnvManager.build_venv", side_effect=lambda *args, **kwargs: ""
     )
@@ -723,7 +723,7 @@ def test_create_venv_does_not_try_to_find_compatible_versions_with_executable(
 
     poetry.package.python_versions = "^4.8"
 
-    mocker.patch("subprocess.check_output", side_effect=["3.8.0"])
+    mocker.patch("subprocess.check_output", side_effect=[b"3.8.0"])
     m = mocker.patch(
         "poetry.utils.env.EnvManager.build_venv", side_effect=lambda *args, **kwargs: ""
     )
@@ -829,7 +829,7 @@ def test_activate_with_in_project_setting_does_not_fail_if_no_venvs_dir(
     )
     mocker.patch(
         "subprocess.Popen.communicate",
-        side_effect=[("/prefix", None), ("/prefix", None)],
+        side_effect=[(b"/prefix", None), (b"/prefix", None)],
     )
     m = mocker.patch("poetry.utils.env.EnvManager.build_venv")
 

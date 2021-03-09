@@ -18,7 +18,7 @@ from poetry.config.dict_config_source import DictConfigSource
 from poetry.factory import Factory
 from poetry.inspection.info import PackageInfo
 from poetry.inspection.info import PackageInfoError
-from poetry.installation import Installer
+from poetry.installation.installer import Installer
 from poetry.layouts import layout
 from poetry.repositories import Pool
 from poetry.repositories import Repository

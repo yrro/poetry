@@ -3,8 +3,6 @@ import sys
 from cleo.helpers import argument
 from cleo.helpers import option
 
-from poetry.utils.helpers import module_name
-
 from .command import Command
 
 
@@ -26,6 +24,7 @@ class NewCommand(Command):
         from poetry.core.vcs.git import GitConfig
         from poetry.layouts import layout
         from poetry.utils.env import SystemEnv
+        from poetry.utils.helpers import module_name
 
         if self.option("src"):
             layout_ = layout("src")

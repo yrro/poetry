@@ -6,21 +6,14 @@ from typing import TYPE_CHECKING
 from typing import Dict
 from typing import Optional
 
-from cleo.io.io import IO
-from cleo.io.null_io import NullIO
-
 from poetry.core.factory import Factory as BaseFactory
-from poetry.core.toml.file import TOMLFile
-
-from .config.config import Config
-from .config.file_config_source import FileConfigSource
-from .locations import CONFIG_DIR
-from .packages.locker import Locker
-from .poetry import Poetry
-from .repositories.pypi_repository import PyPiRepository
 
 
 if TYPE_CHECKING:
+    from cleo.io.io import IO
+
+    from .config.config import Config
+    from .poetry import Poetry
     from .repositories.legacy_repository import LegacyRepository
 
 
@@ -30,8 +23,16 @@ class Factory(BaseFactory):
     """
 
     def create_poetry(
-        self, cwd: Optional[Path] = None, io: Optional[IO] = None
-    ) -> Poetry:
+        self, cwd: Optional[Path] = None, io: Optional["IO"] = None
+    ) -> "Poetry":
+        from cleo.io.null_io import NullIO
+
+        from poetry.core.toml.file import TOMLFile
+
+        from .packages.locker import Locker
+        from .poetry import Poetry
+        from .repositories.pypi_repository import PyPiRepository
+
         if io is None:
             io = NullIO()
 
@@ -105,7 +106,15 @@ class Factory(BaseFactory):
         return poetry
 
     @classmethod
-    def create_config(cls, io: Optional[IO] = None) -> Config:
+    def create_config(cls, io: Optional["IO"] = None) -> "Config":
+        from cleo.io.null_io import NullIO
+
+        from poetry.core.toml.file import TOMLFile
+
+        from .config.config import Config
+        from .config.file_config_source import FileConfigSource
+        from .locations import CONFIG_DIR
+
         if io is None:
             io = NullIO()
 
@@ -141,7 +150,7 @@ class Factory(BaseFactory):
         return config
 
     def create_legacy_repository(
-        self, source: Dict[str, str], auth_config: Config
+        self, source: Dict[str, str], auth_config: "Config"
     ) -> "LegacyRepository":
         from .repositories.legacy_repository import LegacyRepository
         from .utils.helpers import get_cert

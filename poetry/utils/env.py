@@ -13,6 +13,7 @@ import textwrap
 from contextlib import contextmanager
 from pathlib import Path
 from subprocess import CalledProcessError
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
 from typing import Iterator
@@ -21,28 +22,15 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-import packaging.tags
-import tomlkit
-import virtualenv
 
-from cleo.io.io import IO
-from packaging.tags import Tag
-from packaging.tags import interpreter_name
-from packaging.tags import interpreter_version
-from packaging.tags import sys_tags
+if TYPE_CHECKING:
+    from cleo.io.io import IO
+    from packaging.tags import Tag
+    from virtualenv.run.session import Session
 
-from poetry.core.semver.helpers import parse_constraint
-from poetry.core.semver.version import Version
-from poetry.core.toml.file import TOMLFile
-from poetry.core.version.markers import BaseMarker
-from poetry.locations import CACHE_DIR
-from poetry.poetry import Poetry
-from poetry.utils._compat import decode
-from poetry.utils._compat import encode
-from poetry.utils._compat import list_to_shell_command
-from poetry.utils.helpers import is_dir_writable
-from poetry.utils.helpers import paths_csv
-
+    from poetry.core.semver.version import Version
+    from poetry.core.version.markers import BaseMarker
+    from poetry.poetry import Poetry
 
 GET_ENVIRONMENT_INFO = """\
 import json
@@ -169,6 +157,8 @@ class SitePackages:
         if self._writable_candidates is not None:
             return self._writable_candidates
 
+        from poetry.utils.helpers import is_dir_writable
+
         self._writable_candidates = []
         for candidate in self._candidates:
             if not is_dir_writable(path=candidate, create=True):
@@ -198,6 +188,7 @@ class SitePackages:
     def _path_method_wrapper(
         self, path: Path, method: str, *args: Any, **kwargs: Any
     ) -> Union[Tuple[Path, Any], List[Tuple[Path, Any]]]:
+        from poetry.utils.helpers import paths_csv
 
         # TODO: Move to parameters after dropping Python 2.7
         return_first = kwargs.pop("return_first", True)
@@ -268,7 +259,7 @@ class EnvCommandError(EnvError):
         self.e = e
 
         message = "Command {} errored with the following return code {}, and output: \n{}".format(
-            e.cmd, e.returncode, decode(e.output)
+            e.cmd, e.returncode, e.output
         )
         if input:
             message += "input was : {}".format(input)
@@ -304,10 +295,15 @@ class EnvManager(object):
 
     ENVS_FILE = "envs.toml"
 
-    def __init__(self, poetry: Poetry) -> None:
+    def __init__(self, poetry: "Poetry") -> None:
         self._poetry = poetry
 
-    def activate(self, python: str, io: IO) -> "Env":
+    def activate(self, python: str, io: "IO") -> "Env":
+        from poetry.core.semver.version import Version
+        from poetry.core.toml.file import TOMLFile
+        from poetry.locations import CACHE_DIR
+        from poetry.utils._compat import list_to_shell_command
+
         venv_path = self._poetry.config.get("virtualenvs.path")
         if venv_path is None:
             venv_path = Path(CACHE_DIR) / "virtualenvs"
@@ -328,18 +324,16 @@ class EnvManager(object):
             pass
 
         try:
-            python_version = decode(
-                subprocess.check_output(
-                    list_to_shell_command(
-                        [
-                            python,
-                            "-c",
-                            "\"import sys; print('.'.join([str(s) for s in sys.version_info[:3]]))\"",
-                        ]
-                    ),
-                    shell=True,
-                )
-            )
+            python_version = subprocess.check_output(
+                list_to_shell_command(
+                    [
+                        python,
+                        "-c",
+                        "\"import sys; print('.'.join([str(s) for s in sys.version_info[:3]]))\"",
+                    ]
+                ),
+                shell=True,
+            ).decode()
         except CalledProcessError as e:
             raise EnvCommandError(e)
 
@@ -365,6 +359,8 @@ class EnvManager(object):
             self.create_venv(io, executable=python, force=create)
 
             return self.get(reload=True)
+
+        import tomlkit
 
         envs = tomlkit.document()
         base_env_name = self.generate_env_name(self._poetry.package.name, str(cwd))
@@ -404,7 +400,10 @@ class EnvManager(object):
 
         return self.get(reload=True)
 
-    def deactivate(self, io: IO) -> None:
+    def deactivate(self, io: "IO") -> None:
+        from poetry.core.utils.toml_file import TOMLFile
+        from poetry.locations import CACHE_DIR
+
         venv_path = self._poetry.config.get("virtualenvs.path")
         if venv_path is None:
             venv_path = Path(CACHE_DIR) / "virtualenvs"
@@ -431,6 +430,9 @@ class EnvManager(object):
     def get(self, reload: bool = False) -> Union["VirtualEnv", "SystemEnv"]:
         if self._env is not None and not reload:
             return self._env
+
+        from poetry.core.toml.file import TOMLFile
+        from poetry.locations import CACHE_DIR
 
         python_minor = ".".join([str(v) for v in sys.version_info[:2]])
 
@@ -497,6 +499,8 @@ class EnvManager(object):
         return VirtualEnv(prefix, base_prefix)
 
     def list(self, name: Optional[str] = None) -> List["VirtualEnv"]:
+        from poetry.locations import CACHE_DIR
+
         if name is None:
             name = self._poetry.package.name
 
@@ -523,6 +527,11 @@ class EnvManager(object):
         return env_list
 
     def remove(self, python: str) -> "Env":
+        from poetry.core.semver.version import Version
+        from poetry.core.utils.toml_file import TOMLFile
+        from poetry.locations import CACHE_DIR
+        from poetry.utils._compat import list_to_shell_command
+
         venv_path = self._poetry.config.get("virtualenvs.path")
         if venv_path is None:
             venv_path = Path(CACHE_DIR) / "virtualenvs"
@@ -575,18 +584,16 @@ class EnvManager(object):
             pass
 
         try:
-            python_version = decode(
-                subprocess.check_output(
-                    list_to_shell_command(
-                        [
-                            python,
-                            "-c",
-                            "\"import sys; print('.'.join([str(s) for s in sys.version_info[:3]]))\"",
-                        ]
-                    ),
-                    shell=True,
-                )
-            )
+            python_version = subprocess.check_output(
+                list_to_shell_command(
+                    [
+                        python,
+                        "-c",
+                        "\"import sys; print('.'.join([str(s) for s in sys.version_info[:3]]))\"",
+                    ]
+                ),
+                shell=True,
+            ).decode()
         except CalledProcessError as e:
             raise EnvCommandError(e)
 
@@ -617,13 +624,18 @@ class EnvManager(object):
 
     def create_venv(
         self,
-        io: IO,
+        io: "IO",
         name: Optional[str] = None,
         executable: Optional[str] = None,
         force: bool = False,
     ) -> Union["SystemEnv", "VirtualEnv"]:
         if self._env is not None and not force:
             return self._env
+
+        from poetry.core.semver.helpers import parse_constraint
+        from poetry.core.semver.version import Version
+        from poetry.locations import CACHE_DIR
+        from poetry.utils._compat import list_to_shell_command
 
         cwd = self._poetry.file.parent
         env = self.get(reload=True)
@@ -652,7 +664,7 @@ class EnvManager(object):
         python_patch = ".".join([str(v) for v in sys.version_info[:3]])
         python_minor = ".".join([str(v) for v in sys.version_info[:2]])
         if executable:
-            python_patch = decode(
+            python_patch = (
                 subprocess.check_output(
                     list_to_shell_command(
                         [
@@ -662,7 +674,9 @@ class EnvManager(object):
                         ]
                     ),
                     shell=True,
-                ).strip()
+                )
+                .decode()
+                .strip()
             )
             python_minor = ".".join(python_patch.split(".")[:2])
 
@@ -709,7 +723,7 @@ class EnvManager(object):
                     io.write_line("<debug>Trying {}</debug>".format(python))
 
                 try:
-                    python_patch = decode(
+                    python_patch = (
                         subprocess.check_output(
                             list_to_shell_command(
                                 [
@@ -720,7 +734,9 @@ class EnvManager(object):
                             ),
                             stderr=subprocess.STDOUT,
                             shell=True,
-                        ).strip()
+                        )
+                        .decode()
+                        .strip()
                     )
                 except CalledProcessError:
                     continue
@@ -810,7 +826,9 @@ class EnvManager(object):
         path: Union[Path, str],
         executable: Optional[Union[str, Path]] = None,
         flags: Dict[str, bool] = None,
-    ) -> virtualenv.run.session.Session:
+    ) -> "Session":
+        import virtualenv
+
         flags = flags or {}
 
         if isinstance(executable, Path):
@@ -866,7 +884,7 @@ class EnvManager(object):
     def generate_env_name(cls, name: str, cwd: str) -> str:
         name = name.lower()
         sanitized_name = re.sub(r'[ $`!*@"\\\r\n\t]', "_", name)[:42]
-        h = hashlib.sha256(encode(cwd)).digest()
+        h = hashlib.sha256(cwd.encode()).digest()
         h = base64.urlsafe_b64encode(h).decode()[:8]
 
         return "{}-{}".format(sanitized_name, h)
@@ -941,7 +959,7 @@ class Env(object):
         return os.name
 
     @property
-    def pip_version(self) -> Version:
+    def pip_version(self) -> "Version":
         if self._pip_version is None:
             self._pip_version = self.get_pip_version()
 
@@ -1006,7 +1024,7 @@ class Env(object):
         return self._paths
 
     @property
-    def supported_tags(self) -> List[Tag]:
+    def supported_tags(self) -> List["Tag"]:
         if self._supported_tags is None:
             self._supported_tags = self.get_supported_tags()
 
@@ -1034,16 +1052,16 @@ class Env(object):
     def get_pip_command(self) -> List[str]:
         raise NotImplementedError()
 
-    def get_supported_tags(self) -> List[Tag]:
+    def get_supported_tags(self) -> List["Tag"]:
         raise NotImplementedError()
 
-    def get_pip_version(self) -> Version:
+    def get_pip_version(self) -> "Version":
         raise NotImplementedError()
 
     def get_paths(self) -> Dict[str, str]:
         raise NotImplementedError()
 
-    def is_valid_for_marker(self, marker: BaseMarker) -> bool:
+    def is_valid_for_marker(self, marker: "BaseMarker") -> bool:
         return marker.validate(self.marker_env)
 
     def is_sane(self) -> bool:
@@ -1066,6 +1084,8 @@ class Env(object):
         """
         Run a command inside the Python environment.
         """
+        from poetry.utils._compat import list_to_shell_command
+
         call = kwargs.pop("call", False)
         input_ = kwargs.pop("input_", None)
 
@@ -1081,7 +1101,7 @@ class Env(object):
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    input=encode(input_),
+                    input=input_.encode(),
                     check=True,
                     **kwargs,
                 ).stdout
@@ -1094,7 +1114,7 @@ class Env(object):
         except CalledProcessError as e:
             raise EnvCommandError(e, input=input_)
 
-        return decode(output)
+        return output.decode()
 
     def execute(self, bin: str, *args: str, **kwargs: Any) -> Optional[int]:
         bin = self._bin(bin)
@@ -1208,10 +1228,15 @@ class SystemEnv(Env):
 
         return paths
 
-    def get_supported_tags(self) -> List[Tag]:
+    def get_supported_tags(self) -> List["Tag"]:
+        from packaging.tags import sys_tags
+
         return list(sys_tags())
 
     def get_marker_env(self) -> Dict[str, Any]:
+        from packaging.tags import interpreter_name
+        from packaging.tags import interpreter_version
+
         if hasattr(sys, "implementation"):
             info = sys.implementation.version
             iver = "{0.major}.{0.minor}.{0.micro}".format(info)
@@ -1244,8 +1269,10 @@ class SystemEnv(Env):
             "interpreter_version": interpreter_version(),
         }
 
-    def get_pip_version(self) -> Version:
+    def get_pip_version(self) -> "Version":
         from pip import __version__
+
+        from poetry.core.semver.version import Version
 
         return Version.parse(__version__)
 
@@ -1287,14 +1314,18 @@ class VirtualEnv(Env):
         # so assume that we have a functional pip
         return [self._bin("pip")]
 
-    def get_supported_tags(self) -> List[Tag]:
+    def get_supported_tags(self) -> List["Tag"]:
+        import packaging.tags
+
+        from packaging.tags import Tag
+
         file_path = Path(packaging.tags.__file__)
         if file_path.suffix == ".pyc":
             # Python 2
             file_path = file_path.with_suffix(".py")
 
         with file_path.open(encoding="utf-8") as f:
-            script = decode(f.read())
+            script = f.read()
 
         script = script.replace(
             "from ._typing import TYPE_CHECKING, cast",
@@ -1322,7 +1353,9 @@ class VirtualEnv(Env):
 
         return json.loads(output)
 
-    def get_pip_version(self) -> Version:
+    def get_pip_version(self) -> "Version":
+        from poetry.core.semver.version import Version
+
         output = self.run_pip("--version").strip()
         m = re.match("pip (.+?)(?: from .+)?$", output)
         if not m:
@@ -1421,9 +1454,11 @@ class MockEnv(NullEnv):
         pip_version: str = "19.1",
         sys_path: Optional[List[str]] = None,
         marker_env: Dict[str, Any] = None,
-        supported_tags: List[Tag] = None,
+        supported_tags: List["Tag"] = None,
         **kwargs: Any,
     ):
+        from poetry.core.semver.version import Version
+
         super(MockEnv, self).__init__(**kwargs)
 
         self._version_info = version_info
@@ -1445,7 +1480,7 @@ class MockEnv(NullEnv):
         return self._os_name
 
     @property
-    def pip_version(self) -> Version:
+    def pip_version(self) -> "Version":
         return self._pip_version
 
     @property

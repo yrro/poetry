@@ -7,16 +7,11 @@ from typing import Any
 from typing import Optional
 from typing import Tuple
 
-import requests
-import requests.auth
-import requests.exceptions
-
-from poetry.exceptions import PoetryException
-from poetry.utils.password_manager import PasswordManager
-
 
 if TYPE_CHECKING:
     from cleo.io.io import IO
+    from requests import Response
+    from requests import Session
 
     from poetry.config.config import Config
 
@@ -26,6 +21,8 @@ logger = logging.getLogger()
 
 class Authenticator(object):
     def __init__(self, config: "Config", io: Optional["IO"] = None) -> None:
+        from poetry.utils.password_manager import PasswordManager
+
         self._config = config
         self._io = io
         self._session = None
@@ -43,18 +40,26 @@ class Authenticator(object):
             getattr(logger, level, logger.debug)(message)
 
     @property
-    def session(self) -> requests.Session:
+    def session(self) -> "Session":
         if self._session is None:
-            self._session = requests.Session()
+            from requests import Session
+
+            self._session = Session()
 
         return self._session
 
-    def request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
-        request = requests.Request(method, url)
+    def request(self, method: str, url: str, **kwargs: Any) -> "Response":
+        from requests import Request
+        from requests.auth import HTTPBasicAuth
+        from requests.exceptions import ConnectionError
+
+        from poetry.exceptions import PoetryException
+
+        request = Request(method, url)
         username, password = self.get_credentials_for_url(url)
 
         if username is not None and password is not None:
-            request = requests.auth.HTTPBasicAuth(username, password)(request)
+            request = HTTPBasicAuth(username, password)(request)
 
         session = self.session
         prepared_request = session.prepare_request(request)
@@ -81,7 +86,7 @@ class Authenticator(object):
             is_last_attempt = attempt >= 5
             try:
                 resp = session.send(prepared_request, **send_kwargs)
-            except (requests.exceptions.ConnectionError, OSError) as e:
+            except (ConnectionError, OSError) as e:
                 if is_last_attempt:
                     raise e
             else:

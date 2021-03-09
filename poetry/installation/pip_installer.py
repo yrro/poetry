@@ -7,23 +7,21 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Union
 
-from cleo.io.io import IO
-
-from poetry.core.pyproject.toml import PyProjectTOML
-from poetry.repositories.pool import Pool
 from poetry.utils._compat import encode
-from poetry.utils.env import Env
-from poetry.utils.helpers import safe_rmtree
 
 from .base_installer import BaseInstaller
 
 
 if TYPE_CHECKING:
+    from cleo.io.io import IO
+
     from poetry.core.packages.package import Package
+    from poetry.repositories.pool import Pool
+    from poetry.utils.env import Env
 
 
 class PipInstaller(BaseInstaller):
-    def __init__(self, env: Env, io: IO, pool: Pool) -> None:
+    def __init__(self, env: "Env", io: "IO", pool: "Pool") -> None:
         self._env = env
         self._io = io
         self._pool = pool
@@ -106,6 +104,8 @@ class PipInstaller(BaseInstaller):
         self.install(target, update=True)
 
     def remove(self, package: "Package") -> None:
+        from poetry.utils.helpers import safe_rmtree
+
         try:
             self.run("uninstall", package.name, "-y")
         except CalledProcessError as e:
@@ -186,6 +186,7 @@ class PipInstaller(BaseInstaller):
     def install_directory(self, package: "Package") -> Union[str, int]:
         from cleo.io.null_io import NullIO
 
+        from poetry.core.pyproject.toml import PyProjectTOML
         from poetry.factory import Factory
 
         if package.root_dir:
@@ -244,6 +245,7 @@ class PipInstaller(BaseInstaller):
     def install_git(self, package: "Package") -> None:
         from poetry.core.packages.package import Package
         from poetry.core.vcs.git import Git
+        from poetry.utils.helpers import safe_rmtree
 
         src_dir = self._env.path / "src" / package.name
         if src_dir.exists():

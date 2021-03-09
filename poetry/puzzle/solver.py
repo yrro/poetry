@@ -15,9 +15,9 @@ from cleo.io.io import IO
 
 from poetry.core.packages.package import Package
 from poetry.core.packages.project_package import ProjectPackage
-from poetry.installation.operations import Install
-from poetry.installation.operations import Uninstall
-from poetry.installation.operations import Update
+from poetry.installation.operations.install import Install
+from poetry.installation.operations.uninstall import Uninstall
+from poetry.installation.operations.update import Update
 from poetry.mixology import resolve_version
 from poetry.mixology.failure import SolveFailure
 from poetry.packages import DependencyPackage
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from poetry.core.packages.file_dependency import FileDependency
     from poetry.core.packages.url_dependency import URLDependency
     from poetry.core.packages.vcs_dependency import VCSDependency
-    from poetry.installation.operations import OperationTypes
+    from poetry.installation.operations.types import OperationTypes
 
 
 class Solver:
