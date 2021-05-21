@@ -384,9 +384,6 @@ class Provider:
                 difference = difference.intersect(self._python_constraint)
                 if (
                     transitive_python_constraint.is_any()
-                    or self._python_constraint.intersect(
-                        package.dependency.python_constraint
-                    ).is_empty()
                     or intersection.is_empty()
                     or not difference.is_empty()
                 ):

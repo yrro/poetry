@@ -62,7 +62,7 @@ list of installed packages
 
             for i, dependency in enumerate(reversed(dependencies)):
                 if dependency.name == canonicalize_name(key):
-                    del dependencies[-i]
+                    del dependencies[-(i + 1)]
 
         # Update packages
         self._installer.use_executor(
