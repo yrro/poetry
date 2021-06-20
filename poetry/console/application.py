@@ -107,6 +107,22 @@ class Application(BaseApplication):
         command_loader = CommandLoader({name: load_command(name) for name in COMMANDS})
         self.set_command_loader(command_loader)
 
+        from crashtest.solution_providers.solution_provider_repository import (
+            SolutionProviderRepository,
+        )
+        from poetry.mixology.solutions.providers.python_requirement_solution_provider import (
+            PythonRequirementSolutionProvider,
+        )
+        from poetry.solutions.providers.invalid_source_solution_provider import (
+            InvalidSourceSolutionProvider,
+        )
+
+        self.set_solution_provider_repository(
+            SolutionProviderRepository(
+                [InvalidSourceSolutionProvider, PythonRequirementSolutionProvider]
+            )
+        )
+
     @property
     def poetry(self) -> "Poetry":
         from pathlib import Path

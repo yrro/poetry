@@ -40,6 +40,8 @@ from poetry.utils.extras import get_extra_package_names
 if TYPE_CHECKING:
     from tomlkit.toml_document import TOMLDocument
 
+    from poetry.config.config import Config
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,11 +51,17 @@ class Locker:
 
     _relevant_keys = ["dependencies", "dev-dependencies", "source", "extras"]
 
-    def __init__(self, lock: Union[str, Path], local_config: dict) -> None:
+    def __init__(
+        self, lock: Union[str, Path], local_config: dict, config: "Config"
+    ) -> None:
         self._lock = TOMLFile(lock)
         self._local_config = local_config
+        self._config = config
         self._lock_data = None
         self._content_hash = self._get_content_hash()
+        self._sources = {
+            source.pop("name"): source for source in local_config.get("source", [])
+        }
 
     @property
     def lock(self) -> TOMLFile:
@@ -93,6 +101,8 @@ class Locker:
         """
         Searches and returns a repository of locked packages.
         """
+        from poetry.exceptions import InvalidSource
+        from poetry.exceptions import MissingSourceURL
         from poetry.factory import Factory
 
         if not self.is_locked():
@@ -117,6 +127,17 @@ class Locker:
             url = source.get("url")
             if source_type in ["directory", "file"]:
                 url = self._lock.path.parent.joinpath(url).resolve().as_posix()
+            elif source_type == "legacy" and not url:
+                # If we don't have a URL we retrieve it from the global configuration
+                repository_config = self._config.get(
+                    f'repositories.{source["reference"]}'
+                )
+                if not repository_config:
+                    raise MissingSourceURL(source["reference"])
+
+                url = repository_config.get("url")
+                if not url:
+                    raise MissingSourceURL(source["reference"])
 
             package = Package(
                 info["name"],
@@ -593,6 +614,12 @@ class Locker:
 
             if package.source_type in ["directory", "git"]:
                 data["develop"] = package.develop
+
+            if package.source_type == "legacy":
+                # If the url was not explicitly specified in the pyproject.toml/local config
+                # we drop it to keep the desired flexibility of leaving out the URL.
+                if not self._sources[data["source"]["reference"]].get("url"):
+                    del data["source"]["url"]
 
         return data
 

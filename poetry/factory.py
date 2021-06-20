@@ -25,6 +25,7 @@ from .repositories.pypi_repository import PyPiRepository
 
 if TYPE_CHECKING:
     from .repositories.legacy_repository import LegacyRepository
+    from .repositories.pool import Pool
 
 
 class Factory(BaseFactory):
@@ -81,8 +82,8 @@ class Factory(BaseFactory):
         )
 
         # Configuring sources
-        self.configure_sources(
-            poetry, poetry.local_config.get("source", []), config, io
+        poetry.set_pool(
+            self.create_pool(poetry.local_config.get("source", []), config, io)
         )
 
         plugin_manager = PluginManager("plugin", disable_plugins=disable_plugins)
@@ -133,11 +134,18 @@ class Factory(BaseFactory):
         return config
 
     @classmethod
-    def configure_sources(
-        cls, poetry: "Poetry", sources: List[Dict[str, str]], config: "Config", io: "IO"
-    ) -> None:
+    def create_pool(
+        cls, sources: List[Dict[str, str]], config: "Config", io: Optional["IO"] = None
+    ) -> "Pool":
+        from poetry.repositories.pool import Pool
+
+        if io is None:
+            io = NullIO()
+
+        pool = Pool()
         for source in sources:
             repository = cls.create_legacy_repository(source, config)
+
             is_default = source.get("default", False)
             is_secondary = source.get("secondary", False)
             if io.is_debug():
@@ -151,42 +159,52 @@ class Factory(BaseFactory):
 
                 io.write_line(message)
 
-            poetry.pool.add_repository(repository, is_default, secondary=is_secondary)
+            pool.add_repository(repository, is_default, secondary=is_secondary)
 
         # Put PyPI last to prefer private repositories
         # unless we have no default source AND no primary sources
         # (default = false, secondary = false)
-        if poetry.pool.has_default():
+        if pool.has_default():
             if io.is_debug():
                 io.write_line("Deactivating the PyPI repository")
         else:
-            default = not poetry.pool.has_primary_repositories()
-            poetry.pool.add_repository(PyPiRepository(), default, not default)
+            default = not pool.has_primary_repositories()
+            pool.add_repository(PyPiRepository(), default, not default)
+
+        return pool
 
     @classmethod
     def create_legacy_repository(
-        cls, source: Dict[str, str], auth_config: Config
+        cls, source: Dict[str, str], config: Config
     ) -> "LegacyRepository":
+        from .exceptions import InvalidSource
+        from .exceptions import MissingSourceURL
         from .repositories.legacy_repository import LegacyRepository
         from .utils.helpers import get_cert
         from .utils.helpers import get_client_cert
 
-        if "url" in source:
-            # PyPI-like repository
-            if "name" not in source:
-                raise RuntimeError("Missing [name] in source.")
-        else:
-            raise RuntimeError("Unsupported source specified")
+        name = source.get("name")
+        url = source.get("url")
+        if not name:
+            raise InvalidSource()
 
-        name = source["name"]
-        url = source["url"]
+        if not url:
+            # No url was specified, we try to find it from the config
+            repository_config = config.get(f"repositories.{name}")
+            if not repository_config:
+                raise MissingSourceURL(name)
+
+            url = repository_config.get("url")
+
+            if not url:
+                raise MissingSourceURL(name)
 
         return LegacyRepository(
             name,
             url,
-            config=auth_config,
-            cert=get_cert(auth_config, name),
-            client_cert=get_client_cert(auth_config, name),
+            config=config,
+            cert=get_cert(config, name),
+            client_cert=get_client_cert(config, name),
         )
 
     @classmethod

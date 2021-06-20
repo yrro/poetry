@@ -9,6 +9,7 @@ import pytest
 from entrypoints import EntryPoint
 
 from poetry.core.toml.file import TOMLFile
+from poetry.exceptions import MissingSourceURL
 from poetry.factory import Factory
 from poetry.plugins.plugin import Plugin
 from poetry.repositories.legacy_repository import LegacyRepository
@@ -303,3 +304,15 @@ def test_create_poetry_with_plugins(mocker):
     poetry = Factory().create_poetry(fixtures_dir / "sample_project")
 
     assert "9.9.9" == poetry.package.version.text
+
+
+def test_pool_creation_does_not_raise_an_error_for_missing_url_if_configured(config):
+    config.merge({"repositories": {"foo": {"url": "https://foo.bar"}}})
+    pool = Factory.create_pool([{"name": "foo"}], config)
+
+    assert len(pool.repositories) == 2
+
+
+def test_pool_creation_raises_an_error_for_missing_url_if_not_configured(config):
+    with pytest.raises(MissingSourceURL):
+        Factory.create_pool([{"name": "foo"}], config)

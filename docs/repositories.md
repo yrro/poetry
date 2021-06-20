@@ -126,6 +126,10 @@ secondary = true
 ```
 {{% /note %}}
 
+If you already have [configured a repository]({{< relref "#adding-a-repository" >}}) with the proper name,
+you can omit the `url` property. Doing so will give more flexibility to your configuration by allowing
+you to switch the repository URL without modifying your `pyproject.toml` file.
+
 If your private repository requires HTTP Basic Auth be sure to add the username and
 password to your `http-basic` configuration using the example above (be sure to use the
 same name that is in the `tool.poetry.source` section). If your repository requires either
